@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudLive Overlay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Prompt', sans-serif;
+      background: transparent;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      color: #fff;
+    }
+
+    #chat-box {
+      position: fixed;
+      bottom: 24px;
+      left: 16px;
+      right: 16px;
+      max-height: 40vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 8px;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .chat-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+      animation: popIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      opacity: 0;
+      transform: translateY(16px) scale(0.96);
+    }
+
+    .chat-card.fade-out { animation: fadeOut 0.4s ease-out forwards; }
+    .chat-avatar { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #3b82f6; object-fit: cover; flex-shrink: 0; }
+    .chat-body { flex: 1; min-width: 0; }
+    .chat-header { font-size: 12px; font-weight: 600; color: #93c5fd; display: flex; align-items: center; gap: 6px; }
+    .badge-role { font-size: 9px; padding: 1px 6px; border-radius: 6px; font-weight: 500; background: #2563eb; color: #fff; }
+    .chat-msg { font-size: 13.5px; color: #f8fafc; line-height: 1.4; word-break: break-word; margin-top: 2px; }
+
+    #alert-box {
+      position: fixed;
+      top: 36%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 100;
+      width: 90%;
+      max-width: 360px;
+    }
+
+    .gift-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      border-radius: 24px;
+      background: linear-gradient(145deg, rgba(30, 58, 138, 0.9), rgba(15, 23, 42, 0.95));
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1.5px solid rgba(96, 165, 250, 0.4);
+      box-shadow: 0 10px 40px rgba(37, 99, 235, 0.35);
+      animation: giftPop 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      text-align: center;
+    }
+
+    .gift-card.fade-out { animation: fadeOut 0.4s ease-out forwards; }
+    .gift-img { width: 64px; height: 64px; object-fit: contain; filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4)); margin-bottom: 8px; }
+    .gift-sender { font-size: 15px; font-weight: 600; color: #fff; }
+    .gift-info { font-size: 13px; color: #93c5fd; margin-top: 2px; }
+    .gift-diamond { font-size: 11px; font-weight: 600; color: #fbbf24; margin-top: 4px; }
+
+    #follow-box {
+      position: fixed;
+      top: 30px;
+      left: 16px;
+      right: 16px;
+      pointer-events: none;
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .follow-card {
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: slideDown 0.35s ease-out forwards;
+    }
+
+    .follow-card.fade-out { animation: fadeOut 0.3s ease-out forwards; }
+
+    @keyframes popIn { to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes giftPop { 0% { opacity: 0; transform: scale(0.6); } 100% { opacity: 1; transform: scale(1); } }
+    @keyframes slideDown { 0% { opacity: 0; transform: translateY(-16px); } 100% { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeOut { to { opacity: 0; transform: scale(0.94); } }
+  </style>
+</head>
+<body>
+
+  <audio id="tts-audio" style="display:none;"></audio>
+
+  <div id="follow-box"></div>
+  <div id="alert-box"></div>
+  <div id="chat-box"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const USER = params.get('user');
+    const TYPE = params.get('type') || 'all';
+    const MIN_DIAMONDS = parseInt(params.get('minDia') || '1');
+    const TTS_CHAT = params.get('ttsChat') !== 'false';
+    const SFX = params.get('sfx') !== 'false';
+
+    const showChat = TYPE === 'all' || TYPE === 'chat';
+    const showAlert = TYPE === 'all' || TYPE === 'alert';
+
+    const socket = io();
+
+    if (USER) {
+      socket.emit('connect_tiktok', { username: USER });
+    }
+
+    // Audio SFX Synthesis
+    function playBeep(freq = 600) {
+      if (!SFX) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.12, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.25);
+      } catch (_) {}
+    }
+
+    // TTS Queue
+    const ttsQueue = [];
+    let isPlaying = false;
+    const audioEl = document.getElementById('tts-audio');
+
+    function queueTTS(text) {
+      ttsQueue.push(text);
+      if (!isPlaying) playNextTTS();
+    }
+
+    function playNextTTS() {
+      if (ttsQueue.length === 0) {
+        isPlaying = false;
+        return;
+      }
+      isPlaying = true;
+      const text = ttsQueue.shift();
+      const url = `/api/tts?text=${encodeURIComponent(text)}`;
+      audioEl.src = url;
+      audioEl.play().catch(() => {
+        if ('speechSynthesis' in window) {
+          const u = new SpeechSynthesisUtterance(text);
+          u.lang = 'th-TH';
+          u.onend = () => playNextTTS();
+          u.onerror = () => playNextTTS();
+          window.speechSynthesis.speak(u);
+        } else {
+          playNextTTS();
+        }
+      });
+    }
+
+    audioEl.onended = () => playNextTTS();
+    audioEl.onerror = () => playNextTTS();
+
+    socket.on('chat', (data) => {
+      if (showChat) renderChat(data);
+      if (TTS_CHAT) queueTTS(`${data.nickname} พูดว่า ${data.comment}`);
+    });
+
+    socket.on('gift', (data) => {
+      if (showAlert) renderGift(data);
+      playBeep(720);
+
+      if (data.totalDiamonds >= MIN_DIAMONDS) {
+        const msg = data.repeatCount > 1 
+          ? `${data.nickname} ส่ง ${data.giftName} ${data.repeatCount} ชิ้น`
+          : `${data.nickname} ส่ง ${data.giftName}`;
+        queueTTS(msg);
+      }
+    });
+
+    socket.on('follow', (data) => {
+      if (showAlert) renderFollow(data);
+      playBeep(480);
+      queueTTS(`${data.nickname} เริ่มติดตามแล้วค่ะ`);
+    });
+
+    function renderChat(data) {
+      const box = document.getElementById('chat-box');
+      const el = document.createElement('div');
+      el.className = 'chat-card';
+      el.innerHTML = `
+        <img class="chat-avatar" src="${data.profilePictureUrl || 'https://via.placeholder.com/40'}" />
+        <div class="chat-body">
+          <div class="chat-header">
+            <span>${escapeHtml(data.nickname)}</span>
+            ${data.isModerator ? '<span class="badge-role">MOD</span>' : ''}
+          </div>
+          <div class="chat-msg">${escapeHtml(data.comment)}</div>
+        </div>
+      `;
+      box.appendChild(el);
+      if (box.children.length > 7) box.firstChild.remove();
+      setTimeout(() => { if (el.parentNode) { el.classList.add('fade-out'); setTimeout(() => el.remove(), 400); } }, 15000);
+    }
+
+    function renderGift(data) {
+      const box = document.getElementById('alert-box');
+      const el = document.createElement('div');
+      el.className = 'gift-card';
+      el.innerHTML = `
+        <img class="gift-img" src="${data.giftPictureUrl || 'https://via.placeholder.com/64'}" />
+        <div class="gift-sender">${escapeHtml(data.nickname)}</div>
+        <div class="gift-info">ส่ง ${escapeHtml(data.giftName)} x${data.repeatCount}</div>
+        <div class="gift-diamond">💎 ${data.totalDiamonds} diamonds</div>
+      `;
+      box.appendChild(el);
+      setTimeout(() => { el.classList.add('fade-out'); setTimeout(() => el.remove(), 400); }, 5000);
+    }
+
+    function renderFollow(data) {
+      const box = document.getElementById('follow-box');
+      const el = document.createElement('div');
+      el.className = 'follow-card';
+      el.innerHTML = `
+        <div style="font-size:16px;">👤</div>
+        <div style="font-size:12.5px; font-weight:500;"><strong>${escapeHtml(data.nickname)}</strong> เริ่มติดตามคุณ</div>
+      `;
+      box.appendChild(el);
+      setTimeout(() => { if (el.parentNode) { el.classList.add('fade-out'); setTimeout(() => el.remove(), 300); } }, 4000);
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str || '';
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="th" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CloudLive — TikTok Studio Overlay & Automation</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Inter"', '"Prompt"', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe', 300: '#93c5fd',
+              400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
+              800: '#1e40af', 900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { transition: background-color 0.25s ease, color 0.25s ease; }
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 4px; }
+    .phone-container { aspect-ratio: 9/16; max-height: 540px; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-[#0B1120] dark:text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Header -->
+  <header class="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/80 dark:bg-[#0B1120]/80 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-400 flex items-center justify-center text-white shadow-sm shadow-brand-500/30">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+          </svg>
+        </div>
+        <div>
+          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-brand-600 to-sky-500 bg-clip-text text-transparent">CloudLive</span>
+          <span class="text-[11px] font-medium ml-1.5 px-2 py-0.5 rounded-full bg-brand-50 text-brand-600 dark:bg-brand-950/60 dark:text-brand-400 border border-brand-200/50 dark:border-brand-800/40">Studio Pro</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <!-- Standalone Audio Engine Button (TikFinity feature) -->
+        <button id="audio-engine-btn" onclick="toggleAudioEngine()" class="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium flex items-center gap-2 transition-all bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-slate-400" id="audio-dot"></span>
+          <span id="audio-text">Audio Engine: ปิด</span>
+        </button>
+
+        <div id="live-indicator" class="hidden items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/40">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="indicator-text">Online</span>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button id="theme-toggle" class="p-2 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors">
+          <svg id="sun-icon" class="w-4 h-4 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+          </svg>
+          <svg id="moon-icon" class="w-4 h-4 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Grid -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-8 flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-8">
+    
+    <!-- Left: Setup, Triggers & Settings (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col gap-6">
+
+      <!-- Stream Connect Card -->
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#111927] border border-slate-200 dark:border-slate-800/90 shadow-sm shadow-slate-100 dark:shadow-none">
+        <h2 class="text-sm font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500 mb-4">เชื่อมต่อช่อง TikTok Live</h2>
+        
+        <div class="flex flex-col sm:flex-row gap-3">
+          <div class="relative flex-1">
+            <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 text-sm font-semibold">@</div>
+            <input 
+              type="text" 
+              id="username-input" 
+              placeholder="tiktok_username" 
+              class="w-full pl-8 pr-4 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all placeholder:text-slate-400"
+            />
+          </div>
+          <button 
+            id="btn-connect" 
+            onclick="connectStream()"
+            class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-medium text-sm rounded-xl transition-all shadow-sm shadow-brand-600/30 flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            <span>เชื่อมต่อ</span>
+          </button>
+        </div>
+        <p id="connect-status" class="text-xs text-slate-400 mt-2.5 flex items-center gap-1.5"></p>
+      </div>
+
+      <!-- Settings & Spam Filter (สิ่งที่ทำให้เหมือน/ดีกว่า TikFinity) -->
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#111927] border border-slate-200 dark:border-slate-800/90 shadow-sm shadow-slate-100 dark:shadow-none">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">การตั้งค่าระบบเสียง & ป้องกันสแปม</h2>
+          <span class="text-xs text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/60 px-2 py-0.5 rounded-md font-medium">Auto-Save</span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <!-- TTS Chat Toggle -->
+          <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
+            <div>
+              <div class="font-medium text-slate-800 dark:text-slate-200">เสียงสิริอ่านแชทสด</div>
+              <div class="text-[11px] text-slate-400">อ่านข้อความคนดูอัตโนมัติ</div>
+            </div>
+            <input type="checkbox" id="setting-tts-chat" checked onchange="saveSettings()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 cursor-pointer">
+          </div>
+
+          <!-- Sound FX on Gift -->
+          <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex items-center justify-between">
+            <div>
+              <div class="font-medium text-slate-800 dark:text-slate-200">เสียงเอฟเฟกต์ (SFX)</div>
+              <div class="text-[11px] text-slate-400">เสียงกระดิ่งเมื่อได้ของขวัญ</div>
+            </div>
+            <input type="checkbox" id="setting-sfx" checked onchange="saveSettings()" class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500 cursor-pointer">
+          </div>
+
+          <!-- Min Diamonds Filter -->
+          <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 col-span-1 sm:col-span-2">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="font-medium text-slate-800 dark:text-slate-200">เหรียญขั้นต่ำที่จะให้ออกเสียงพูด (Min Diamonds)</span>
+              <span id="diamond-val" class="font-mono text-brand-600 dark:text-brand-400 font-semibold">1 เหรียญ</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mb-2">ป้องกันคนส่งดอกกุหลาบ 1 เหรียญรัวๆ เพื่อป่วนไลฟ์</p>
+            <input type="range" id="setting-min-diamonds" min="1" max="100" value="1" oninput="updateDiamondLabel(this.value)" onchange="saveSettings()" class="w-full accent-brand-600 cursor-pointer">
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Test Simulator (TikFinity Style) -->
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#111927] border border-slate-200 dark:border-slate-800/90 shadow-sm shadow-slate-100 dark:shadow-none">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">จำลองเหตุการณ์ (Test Simulator)</h2>
+          <span class="text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md font-medium">กดทดสอบได้ทันที</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button onclick="simulateEvent('chat')" class="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-300 transition-all flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+            <span>ทดสอบส่งแชท</span>
+          </button>
+          <button onclick="simulateEvent('gift')" class="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-300 transition-all flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V4a2 2 0 10-2 2h2m-7 4h14a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2v-7a2 2 0 012-2z"/></svg>
+            <span>ทดสอบของขวัญ</span>
+          </button>
+          <button onclick="simulateEvent('follow')" class="px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 text-xs font-medium text-slate-700 dark:text-slate-300 transition-all flex items-center justify-center gap-2">
+            <svg class="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+            <span>ทดสอบคนติดตาม</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Browser Source Modular Links -->
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#111927] border border-slate-200 dark:border-slate-800/90 shadow-sm shadow-slate-100 dark:shadow-none">
+        <h2 class="text-sm font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500 mb-4">ลิงก์นำไปใส่ในโปรแกรมสตรีม (Browser Source)</h2>
+        <div class="space-y-3">
+          <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-xs font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <span>All-in-One Overlay (9:16)</span>
+                <span class="text-[10px] bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-300 px-1.5 py-0.5 rounded">แนะนำ</span>
+              </div>
+              <div class="text-[11px] text-slate-400 truncate mt-0.5 font-mono" id="link-all">กรุณาเชื่อมต่อก่อน</div>
+            </div>
+            <button onclick="copyLink('link-all')" class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg transition-all">คัดลอก</button>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-xs font-medium text-slate-800 dark:text-slate-200">Chat Box Only (เฉพาะกล่องแชท)</div>
+              <div class="text-[11px] text-slate-400 truncate mt-0.5 font-mono" id="link-chat">กรุณาเชื่อมต่อก่อน</div>
+            </div>
+            <button onclick="copyLink('link-chat')" class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg transition-all">คัดลอก</button>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-xs font-medium text-slate-800 dark:text-slate-200">Alert Only (เฉพาะป้ายแจ้งเตือนของขวัญ)</div>
+              <div class="text-[11px] text-slate-400 truncate mt-0.5 font-mono" id="link-alert">กรุณาเชื่อมต่อก่อน</div>
+            </div>
+            <button onclick="copyLink('link-alert')" class="px-3 py-1.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-xs font-medium text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-lg transition-all">คัดลอก</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right: Phone Preview & Event Logs (5 cols) -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+
+      <!-- Live 9:16 Phone Preview -->
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#111927] border border-slate-200 dark:border-slate-800/90 shadow-sm shadow-slate-100 dark:shadow-none flex flex-col items-center">
+        <div class="w-full flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">ตัวอย่างสด 9:16</h2>
+          <span class="text-xs text-slate-400">Stream Screen</span>
+        </div>
+
+        <div class="phone-container w-[270px] rounded-[36px] bg-slate-950 p-2.5 shadow-2xl shadow-brand-950/20 ring-1 ring-slate-800 relative">
+          <div class="absolute top-4 left-1/2 -translate-x-1/2 w-20 h-4 bg-slate-900 rounded-full z-20"></div>
+          <div class="w-full h-full rounded-[28px] overflow-hidden bg-slate-900 relative">
+            <iframe id="preview-frame" src="about:blank" class="w-full h-full border-none"></iframe>
+          </div>
+        </div>
+      </div>
+
+      <!-- Realtime Activity Log -->
+      <div class="p-6 rounded-2xl bg-white dark:bg-[#111927] border border-slate-200 dark:border-slate-800/90 shadow-sm shadow-slate-100 dark:shadow-none flex-1 flex flex-col">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-sm font-semibold tracking-wide uppercase text-slate-400 dark:text-slate-500">เหตุการณ์ล่าสุด (Live Events)</h2>
+          <span id="event-count" class="text-xs font-mono text-slate-400">0 events</span>
+        </div>
+        <div id="event-list" class="flex-1 space-y-2 max-h-48 overflow-y-auto custom-scrollbar text-xs text-slate-500">
+          <div class="py-8 text-center text-slate-400">ยังไม่มีเหตุการณ์เข้ามา</div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <audio id="standalone-audio" style="display:none;"></audio>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    let currentUsername = localStorage.getItem('cloudlive_user') || '';
+    let totalEvents = 0;
+    let audioEngineActive = false;
+    const standaloneAudio = document.getElementById('standalone-audio');
+
+    // Load Settings
+    const settings = {
+      ttsChat: localStorage.getItem('setting_tts_chat') !== 'false',
+      sfx: localStorage.getItem('setting_sfx') !== 'false',
+      minDiamonds: parseInt(localStorage.getItem('setting_min_diamonds') || '1')
+    };
+
+    document.getElementById('setting-tts-chat').checked = settings.ttsChat;
+    document.getElementById('setting-sfx').checked = settings.sfx;
+    document.getElementById('setting-min-diamonds').value = settings.minDiamonds;
+    updateDiamondLabel(settings.minDiamonds);
+
+    function updateDiamondLabel(val) {
+      document.getElementById('diamond-val').textContent = `${val} เหรียญ`;
+    }
+
+    function saveSettings() {
+      settings.ttsChat = document.getElementById('setting-tts-chat').checked;
+      settings.sfx = document.getElementById('setting-sfx').checked;
+      settings.minDiamonds = parseInt(document.getElementById('setting-min-diamonds').value);
+
+      localStorage.setItem('setting_tts_chat', settings.ttsChat);
+      localStorage.setItem('setting_sfx', settings.sfx);
+      localStorage.setItem('setting_min_diamonds', settings.minDiamonds);
+
+      if (currentUsername) updateLinks(currentUsername);
+    }
+
+    // Standalone Audio Engine Toggle
+    function toggleAudioEngine() {
+      audioEngineActive = !audioEngineActive;
+      const dot = document.getElementById('audio-dot');
+      const text = document.getElementById('audio-text');
+
+      if (audioEngineActive) {
+        dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
+        text.textContent = "Audio Engine: ทำงาน (เปิดเสียงบนเว็บ)";
+        playTone(600, 0.1); // Beep feedback
+      } else {
+        dot.className = "w-2 h-2 rounded-full bg-slate-400";
+        text.textContent = "Audio Engine: ปิด";
+      }
+    }
+
+    // Web Audio API Synthesized Sound Effect (SFX)
+    function playTone(freq = 520, duration = 0.2) {
+      if (!settings.sfx && !audioEngineActive) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.setValueAtTime(freq, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+        osc.start();
+        osc.stop(ctx.currentTime + duration);
+      } catch (_) {}
+    }
+
+    // Theme Switcher
+    const themeToggleBtn = document.getElementById('theme-toggle');
+    if (localStorage.getItem('color-theme') === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+
+    themeToggleBtn.addEventListener('click', () => {
+      if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('color-theme', 'light');
+      } else {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('color-theme', 'dark');
+      }
+    });
+
+    if (currentUsername) {
+      document.getElementById('username-input').value = currentUsername;
+      updateLinks(currentUsername);
+    }
+
+    function updateLinks(username) {
+      const base = window.location.origin;
+      const q = `user=${username}&minDia=${settings.minDiamonds}&ttsChat=${settings.ttsChat}&sfx=${settings.sfx}`;
+      document.getElementById('link-all').textContent = `${base}/overlay.html?${q}`;
+      document.getElementById('link-chat').textContent = `${base}/overlay.html?${q}&type=chat`;
+      document.getElementById('link-alert').textContent = `${base}/overlay.html?${q}&type=alert`;
+      
+      const preview = document.getElementById('preview-frame');
+      preview.src = `/overlay.html?${q}`;
+    }
+
+    function connectStream() {
+      const input = document.getElementById('username-input');
+      const val = input.value.trim().replace('@', '');
+      if (!val) return;
+
+      currentUsername = val;
+      localStorage.setItem('cloudlive_user', val);
+      updateLinks(val);
+
+      const status = document.getElementById('connect-status');
+      status.innerHTML = `<span class="animate-spin inline-block mr-1">🌀</span> กำลังเชื่อมต่อ @${val}...`;
+
+      socket.emit('connect_tiktok', { username: val });
+    }
+
+    function simulateEvent(type) {
+      if (!currentUsername) {
+        alert('กรุณากรอก TikTok Username ก่อนทดสอบครับ');
+        return;
+      }
+      socket.emit('simulate_event', { username: currentUsername, type });
+    }
+
+    function copyLink(id) {
+      const text = document.getElementById(id).textContent;
+      if (!text || text.includes('กรุณา')) return;
+      navigator.clipboard.writeText(text);
+      alert('คัดลอกลิงก์สำเร็จ นำไปใส่ใน OBS / TikTok Live Studio ได้เลยครับ');
+    }
+
+    socket.on('connected', (data) => {
+      document.getElementById('live-indicator').classList.remove('hidden');
+      document.getElementById('live-indicator').classList.add('flex');
+      document.getElementById('indicator-text').textContent = `@${data.username} Online`;
+      document.getElementById('connect-status').innerHTML = `✅ เชื่อมต่อกับ @${data.username} สำเร็จ`;
+    });
+
+    socket.on('connection_error', (data) => {
+      document.getElementById('connect-status').innerHTML = `<span class="text-rose-500">❌ ${data.message}</span>`;
+    });
+
+    socket.on('chat', (data) => {
+      pushEvent(`💬 <strong>${data.nickname}</strong>: ${data.comment}`);
+      if (audioEngineActive && settings.ttsChat) {
+        playTTSStandalone(`${data.nickname} พูดว่า ${data.comment}`);
+      }
+    });
+
+    socket.on('gift', (data) => {
+      pushEvent(`🎁 <strong>${data.nickname}</strong> ส่ง ${data.giftName} (💎${data.totalDiamonds})`);
+      if (audioEngineActive) {
+        playTone(750, 0.3);
+        if (data.totalDiamonds >= settings.minDiamonds) {
+          playTTSStandalone(`${data.nickname} ส่ง ${data.giftName}`);
+        }
+      }
+    });
+
+    socket.on('follow', (data) => {
+      pushEvent(`👤 <strong>${data.nickname}</strong> เริ่มติดตามแล้ว`);
+      if (audioEngineActive) playTone(500, 0.2);
+    });
+
+    function playTTSStandalone(text) {
+      standaloneAudio.src = `/api/tts?text=${encodeURIComponent(text)}`;
+      standaloneAudio.play().catch(() => {});
+    }
+
+    function pushEvent(html) {
+      totalEvents++;
+      document.getElementById('event-count').textContent = `${totalEvents} events`;
+      const list = document.getElementById('event-list');
+      if (list.querySelector('.text-center')) list.innerHTML = '';
+      
+      const item = document.createElement('div');
+      item.className = 'p-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 text-slate-700 dark:text-slate-300 animate-fadeIn';
+      item.innerHTML = html;
+      list.prepend(item);
+    }
+  </script>
+</body>
+</html>
